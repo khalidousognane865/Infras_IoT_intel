@@ -6,7 +6,7 @@ Ce projet est une implémentation complète d'un pipeline d'ingénierie des donn
 L'objectif est de simuler une flotte de capteurs connectés, d'ingérer leurs données à haute fréquence, et de les traiter à la volée pour détecter des anomalies critiques (ex: surchauffe) avant le stockage.
 
 ## 🏗️ Architecture Technique
-![Architecture Diagram](./diagrams/Architecture .png)
+![Architecture Diagram](./diagrammes/Architecture .png)
 
 Le projet repose sur une architecture conteneurisée via **Docker** :
 * **Source** : Script Python simulant des capteurs IoT (Température, Humidité, Geolocation) générant des données au format JSON.
