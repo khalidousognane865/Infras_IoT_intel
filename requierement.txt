@@ -1,0 +1,9 @@
+# Pour la simulation des capteurs (Producteur)
+kafka-python==2.0.2
+
+# Pour le script de test vers MongoDB (Consommateur temporaire)
+pymongo==4.6.1
+
+# Pour le développement local Spark (Aide à l'autocomplétion dans VSCode)
+# Note : Le vrai traitement se fait dans le conteneur Docker, mais c'est utile de l'avoir ici.
+pyspark==3.5.1

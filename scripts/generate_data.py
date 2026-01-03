@@ -2,12 +2,26 @@ import json
 import time
 import random
 from datetime import datetime
+from random import choice
+from kafka import KafkaProducer
 
+
+#Configuration kafka
+KAFKA_TOPIC="iot_sensor_data"
+KAFKA_BOOTSTRAP_SERVERS=['localhost:9092'] #adresse du broker kafka Docker
 
 #Configuration du simulateur
-SENSOR_ID="sensor_alpha_01"  #identifiantr du capteur
+SENSOR_ID_1="sensor_alpha_01"  #identifiantr du capteur 1
+SENSOR_ID_2="sensor_alpha_02"  #identifiant du capteur 2
 LOCATION="Champs_zone_A"  # ou se trouve le capteur
 INTERVAL= 3 # l'interval en s entre deux envois
+
+#Initialisation du producteur Kafka
+#value_serializer : transforme automatiquement nos dos dictionnaires Python en JSON binaire
+producer=KafkaProducer(
+    bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
 
 def generateur_sensor_data():
     """
@@ -26,9 +40,11 @@ def generateur_sensor_data():
     #Luminosité 
     luminosite=round(random.uniform(0,100000),1)
 
-    #On crée la structure de la donnée 
+    #On choisit aléatoirement un des deux capteurs 
+    sensor_id=random.choice([SENSOR_ID_1,SENSOR_ID_2])
+    #On crée la structure de la donnée
     data={
-        "sensor_id":SENSOR_ID,
+        "sensor_id":sensor_id,
         "location":LOCATION,
         "timestamp":datetime.now().isoformat(), #format standard ISO 8601
         "metrics":{
@@ -40,30 +56,36 @@ def generateur_sensor_data():
         "status":"OK"
      }
 
-    #Simuler une panne rare (1 chance sur 1) pour tester le futur monitoring
-    if random.randint(1,20)==1:
+    #Simuler une panne rare (1 chance sur 10) pour tester le futur monitoring
+    if random.randint(1,10)==1:
         data["metrics"]["temperature"]=999.9 # valeurs aberante
         data["status"]= "ERROR"
     return data
     
 def main():
-    print(f"---Démarrage du capteur {SENSOR_ID}---")
+    print(f"---Démarrage des capteurs vers Kafka {KAFKA_BOOTSTRAP_SERVERS}---")
     print("Appuyer sur CTRL+C pour arréter.")        
     try:
         while True:
             #Génération des données
             record=generateur_sensor_data()
+            #Envoi de la donnée à Kafka
+            #On envoie la donnée dans le "tuyau" (topic) 
+            producer.send(KAFKA_TOPIC, value=record)
 
+            #On force l'envoi immédiat pourt etre sur que ce n'est pas bloqué en mémoire tampon
+            
             #Conversion en json (sérialisation)
             json_record=json.dumps(record)
-
+            producer.flush()
             #On affiche pour l'instant ,plus tard on l'enverra à Kafka
-            print(f"Envoie de la donnée:{json_record}")
+            print(f"✅ Donnée envoyée à Kafka [{record['sensor_id']}]: {record['metrics']['temperature']}°C")
 
             #pause
             time.sleep(INTERVAL)
     except KeyboardInterrupt:
         print("\n --- Arret du simulateur---")
+        producer.close()
 
 
 if __name__== "__main__":
