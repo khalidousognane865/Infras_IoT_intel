@@ -21,7 +21,7 @@ json_schema = StructType([
     StructField("status", StringType(), True)
 ])
 
-# 3. Lecture Kafka
+# 3. Lecture Kafka 
 kafka_stream = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:29092") \
@@ -29,7 +29,7 @@ kafka_stream = spark.readStream \
     .option("startingOffsets", "earliest") \
     .load()
 
-# 4. Transformation
+# 4. Transformation DES DONNÉES
 processed_stream = kafka_stream.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), json_schema).alias("data")) \
     .select("data.*")
