@@ -1,18 +1,15 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import from_json, col, expr
-from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType
+from pyspark.sql.types import StructType, StructField, StringType, DoubleType
 
 # 1. Création de la session Spark
-# On ajoute les "packages" nécessaires pour que Spark sache parler à Kafka
 spark = SparkSession.builder \
     .appName("IoT_Sensor_Processing") \
-    .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0") \
     .getOrCreate()
 
-spark.sparkContext.setLogLevel("WARN") # Pour éviter d'avoir trop de blabla dans la console
+spark.sparkContext.setLogLevel("WARN")
 
-# 2. Définition du schéma (La structure de tes données JSON)
-# C'est obligatoire en Streaming structuré
+# 2. Définition du schéma
 json_schema = StructType([
     StructField("sensor_id", StringType(), True),
     StructField("location", StringType(), True),
@@ -24,29 +21,34 @@ json_schema = StructType([
     StructField("status", StringType(), True)
 ])
 
-# 3. Lecture du flux Kafka (ReadStream)
+# 3. Lecture Kafka
 kafka_stream = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:29092") \
     .option("subscribe", "iot_sensor_data") \
-    .option("startingOffsets", "latest") \
+    .option("startingOffsets", "earliest") \
     .load()
 
-# 4. Transformation des données
-# Kafka envoie les données sous forme binaire (colonne 'value'). Il faut les convertir en String puis en JSON.
+# 4. Transformation
 processed_stream = kafka_stream.selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), json_schema).alias("data")) \
-    .select("data.*") # On "aplatit" la structure pour avoir les colonnes directes
+    .select("data.*")
 
-# Petit traitement Data Engineer : On ajoute une colonne "Alert" si T° > 800
 analyzed_stream = processed_stream.withColumn("is_critical", expr("metrics.temperature > 50"))
 
-# 5. Affichage dans la console (WriteStream)
+# --- CORRECTIONS APPLIQUÉES ICI ---
+print("--- Démarrage de l'écriture vers MongoDB ---")
+
+# URI de connexion
+MONGO_URI = "mongodb://admin:password123@mongodb:27017/iot_database.sensor_data?authSource=admin"
+
 query = analyzed_stream.writeStream \
     .outputMode("append") \
-    .format("console") \
-    .option("truncate", "false") \
+    .format("mongodb") \
+    .option("spark.mongodb.connection.uri", MONGO_URI) \
+    .option("spark.mongodb.database", "iot_database") \
+    .option("spark.mongodb.collection", "sensor_data") \
+    .option("checkpointLocation", "/tmp/checkpoint_dir_v3") \
     .start()
 
-print("--- Streaming Spark démarré ---")
 query.awaitTermination()
